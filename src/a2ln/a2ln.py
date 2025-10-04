@@ -29,7 +29,6 @@ from importlib import metadata
 from pathlib import Path
 from typing import Optional
 
-import gi
 import qrcode  # type: ignore
 import zmq
 import zmq.auth
@@ -37,9 +36,6 @@ import zmq.auth.thread
 import zmq.error
 from PIL import Image
 
-gi.require_version('Notify', '0.7')
-
-from gi.repository import Notify  # type: ignore # noqa: E402
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -62,12 +58,12 @@ def main() -> None:
     clients_directory = main_directory / "clients"
     own_directory = main_directory / "server"
 
-    main_directory.mkdir(exist_ok=True)
+    main_directory.mkdir(parents=True, exist_ok=True)
 
     clients_directory.mkdir(exist_ok=True)
 
     if not own_directory.exists():
-        own_directory.mkdir()
+        own_directory.mkdir(parents=True, exist_ok=True)
 
         zmq.auth.create_certificates(own_directory, "server")
 
@@ -144,12 +140,14 @@ def get_ip() -> str:
 
 
 def send_notification(title: str, body: str, picture_file=None) -> None:
-    if picture_file is None:
-        Notify.Notification.new(title, body, "dialog-information").show()
-    else:
-        Notify.Notification.new(title, body, picture_file.name).show()
+    # Solo loguea la notificación o envíala a tu servidor
+    notification_data = {
+        "title": title,
+        "body": body,
+        "picture": picture_file.name if picture_file else None
+    }
+    print(f"Received notification: {notification_data}")
 
-        picture_file.close()
 
 
 def handle_error(error: zmq.error.ZMQError) -> None:
@@ -206,8 +204,6 @@ class NotificationServer(threading.Thread):
                 print(
                     f"Notification server running on IP {BOLD}{self.ip}{RESET} and port {BOLD}{self.port}{RESET} with notifications {BOLD}{"disabled" if self.disabled else "enabled"}{RESET}.")
 
-                Notify.init("Android 2 Linux Notifications")
-
                 while True:
                     request = server.recv_multipart()
 
@@ -228,18 +224,16 @@ class NotificationServer(threading.Thread):
                     body = request[2].decode("utf-8")
                     package = request[3].decode("utf-8")
 
-                    print()
-                    print(
-                        f"Received notification (App: {BOLD}{app}{RESET}, Title: {BOLD}{title}{RESET}, Body: {BOLD}{body}{RESET}, Package: {BOLD}{package}{RESET})")
-
                     def replace(text: str) -> str:
                         return text.replace("{app}", app).replace("{title}", title).replace("{body}", body).replace(
                             "{package}", package)
 
-                    if not self.disabled:
-                        threading.Thread(target=send_notification,
-                                         args=(replace(self.title_format), replace(self.body_format), picture_file),
-                                         daemon=True).start()
+                    send_notification(
+                        replace(self.title_format),
+                        replace(self.body_format),
+                        picture_file
+)
+
 
                     if self.command is not None:
                         subprocess.Popen(replace(self.command), shell=True)
