@@ -1,0 +1,11 @@
+services:
+  a2ln:
+    build: .
+    container_name: a2ln_server
+    restart: unless-stopped
+    ports:
+      - "23045:23045"
+      - "23046:23046"
+    volumes:
+      - ./data:/app/data
+    command: tail -f /dev/null
