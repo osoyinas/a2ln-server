@@ -18,3 +18,6 @@ RUN pip install --no-cache-dir Pillow pyzmq qrcode
 RUN python -m pip install --user .
 
 ENV PATH="/root/.local/bin:$PATH"
+CMD ["a2ln"]
+ENV PYTHONUNBUFFERED=1
+

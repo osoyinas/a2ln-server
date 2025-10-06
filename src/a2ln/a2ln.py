@@ -17,6 +17,7 @@
 import argparse
 import io
 import os
+import requests
 import signal
 import socket
 import subprocess
@@ -42,6 +43,12 @@ RESET = "\033[0m"
 
 DEFAULT_PORT = 23045
 
+N8N_WEBHOOK = os.environ.get("N8N_WEBHOOK")
+
+print(f"N8N_WEBHOOK is set to: {N8N_WEBHOOK}")
+if N8N_WEBHOOK is None:
+    print("N8N_WEBHOOK environment variable is not set. Exiting.")
+    exit(1)
 
 def main() -> None:
     args = parse_args()
@@ -139,15 +146,28 @@ def get_ip() -> str:
         return client.getsockname()[0]
 
 
-def send_notification(title: str, body: str, picture_file=None) -> None:
-    # Solo loguea la notificación o envíala a tu servidor
+def send_notification(title: str, body: str, package: Optional[str] = None, app: Optional[str] = None) -> None:
+    # Envía más metadatos (por ejemplo, package y app) y no incluye la imagen
     notification_data = {
         "title": title,
         "body": body,
-        "picture": picture_file.name if picture_file else None
     }
-    print(f"Received notification: {notification_data}")
+    if package is not None:
+        notification_data["package"] = package
+    if app is not None:
+        notification_data["app"] = app
 
+    print(f"Received notification: {notification_data}")
+    print(f"Sending notification to webhook: {N8N_WEBHOOK}")
+    if N8N_WEBHOOK:
+        try:
+            response = requests.post(N8N_WEBHOOK, json=notification_data)
+            response.raise_for_status()
+            print(f"Notification sent to webhook: {response.status_code}")
+        except requests.RequestException as e:
+            print(f"Failed to send notification to webhook: {e}")
+    else:
+        print("N8N_WEBHOOK is not set. Skipping webhook POST.")
 
 
 def handle_error(error: zmq.error.ZMQError) -> None:
@@ -231,7 +251,8 @@ class NotificationServer(threading.Thread):
                     send_notification(
                         replace(self.title_format),
                         replace(self.body_format),
-                        picture_file
+                        package=package,
+                        app=app
 )
 
 
